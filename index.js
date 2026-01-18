@@ -1,4 +1,3 @@
-// index.js
 const express = require("express");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cors = require("cors");
@@ -29,7 +28,7 @@ const items = {
   QUICHE_SLICE: { name: "Quiche (Slice)", price: 8 },
   SAUSAGE_PEPPERS: { name: "Sausage & Peppers", price: 16 },
   POTATO_SALAD: { name: "Potato Salad", price: 12 },
-  GREEN_BEAN_TRAY: { name: "World Famous Green Bean Casserole (Whole Tray)", price: 30 },
+  GREEN_BEAN_TRAY: { name: "Green Bean Casserole (Whole Tray)", price: 30 },
   STUFFED_CABBAGE: { name: "Stuffed Cabbage", price: 20 },
   BRISKET: { name: "Brisket", price: 25 },
   KUGEL_SLICE: { name: "Noodle Kugel (Slice)", price: 8 },
@@ -43,48 +42,68 @@ const items = {
   PISTACHIO: { name: "Pistachio Pudding with Cherry Topping", price: 12 },
 };
 
-// POST endpoint to create checkout session
+// Create checkout session
 app.post("/create-checkout-session", async (req, res) => {
   try {
-    const { itemKeys } = req.body; // Expect an array of itemKeys
+    const { itemKeys } = req.body;
 
-    if (!itemKeys || !Array.isArray(itemKeys) || itemKeys.length === 0) {
-      return res.status(400).json({ error: "itemKeys must be a non-empty array" });
+    if (!itemKeys || !Array.isArray(itemKeys)) {
+      return res.status(400).json({ error: "itemKeys must be an array" });
     }
 
-    // Map itemKeys to Stripe line items
-    const line_items = itemKeys.map(key => {
-      const item = items[key];
-      if (!item) {
-        throw new Error(`Invalid itemKey: ${key}`);
-      }
+    const line_items = itemKeys.map((key) => {
+      if (!items[key]) throw new Error(`Invalid itemKey: ${key}`);
       return {
         price_data: {
           currency: "usd",
-          product_data: {
-            name: item.name,
-          },
-          unit_amount: item.price * 100, // Stripe expects cents
+          product_data: { name: items[key].name },
+          unit_amount: items[key].price * 100, // cents
         },
         quantity: 1,
       };
     });
 
-    // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items,
       mode: "payment",
-      success_url: "https://google.com", // Replace with your actual success page
-      cancel_url: "https://google.com",  // Replace with your actual cancel page
+      success_url: "https://google.com",
+      cancel_url: "https://google.com",
     });
 
-    console.log("Stripe session created:", session.url);
+    console.log("STRIPE SESSION URL:", session.url);
 
     res.json({ url: session.url });
-  } catch (error) {
-    console.error("Error creating checkout session:", error);
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Temporary test route
+app.get("/test", async (req, res) => {
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: { name: "Test Item" },
+            unit_amount: 500,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      success_url: "https://google.com",
+      cancel_url: "https://google.com",
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -93,3 +112,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Stripe backend running on port ${PORT}`);
 });
+
